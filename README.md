@@ -8,10 +8,12 @@ This repository contains a local-first Next.js app plus planning docs. Implement
 
 - Lets a beginner practice opening moves on a real chessboard.
 - Teaches the London System for White and the Caro-Kann for Black.
+- Lets you choose specific opening lines instead of only drilling the first line.
 - Provides guided, drill, assisted, and review practice modes.
 - Tracks progress locally in the browser, with no account or backend.
 - Resurfaces missed positions in a review queue.
 - Supports selectable tutor styles.
+- Plays optional move feedback sounds while practicing.
 
 ## Development
 
@@ -59,3 +61,4 @@ Use [docs/RELEASE.md](docs/RELEASE.md) before merging release-oriented changes. 
 - [Product requirements](docs/PRD.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Release checklist](docs/RELEASE.md)
+- [Curriculum backlog](docs/CURRICULUM_BACKLOG.md)

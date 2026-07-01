@@ -24,7 +24,10 @@ V1 target: personal app, free to run, local progress, no backend, no AI dependen
 | M7 Progress and Review | Complete | module/m7-progress-review |
 | M8 Practice Modes | Complete | module/m8-practice-modes |
 | M9 Design System and UX Polish | Complete | module/m9-design-system-polish |
-| M10 Testing and Release | In review | module/m10-testing-release |
+| M10 Testing and Release | Complete | module/m10-testing-release |
+| M11 Variation Access and Move Audio | In progress | module/m11-variation-access-audio |
+| C1 London Depth Pack | Planned | TBD |
+| C2 Caro-Kann Depth Pack | Planned | TBD |
 
 ## 2. Milestone Map
 
@@ -47,6 +50,10 @@ timeline
   section Quality
     M9 Design System : responsive, accessible, tutor styles
     M10 Testing and Release : unit, integration, browser verification
+  section Curriculum Depth
+    M11 Variation Access : line selector, move audio
+    C1 London Depth Pack : deeper lines, traps, tactics
+    C2 Caro-Kann Depth Pack : major White tries, traps, tactics
 ```
 
 ## 3. Dependency Graph
@@ -67,6 +74,10 @@ flowchart TD
   I --> J[M9 Design System]
   J --> K[M10 Testing and Release]
   E --> K
+  F --> L[M11 Variation Access and Move Audio]
+  G --> L
+  L --> M[C1 London Depth Pack]
+  L --> N[C2 Caro-Kann Depth Pack]
 ```
 
 ## 4. Module Breakdown
@@ -482,6 +493,34 @@ Release checklist:
 - Test mobile viewport.
 - Test reduced-motion mode.
 
+### M11: Variation Access And Move Audio
+
+Purpose:
+
+- Repair the thin practice experience by exposing all authored variation starts and adding move feedback sound.
+
+Dependencies:
+
+- M5 and M6 authored multiple variations.
+- M9 provides the responsive practice toolbar.
+- M10 provides release smoke coverage.
+
+Acceptance criteria:
+
+- London and Caro-Kann each show a `Line` selector.
+- Selecting a line resets the board to that variation's starting node.
+- Review positions restore their opening and variation context.
+- Optional move audio plays after legal/correct and warning move outcomes.
+- Sound preference persists locally and can be muted.
+- Release checklist covers variation switching and sound.
+
+Implementation notes:
+
+- Keep the curriculum as the source of truth.
+- Add selectors for variation-specific starting nodes.
+- Do not add an engine, backend, or AI dependency for this repair.
+- Treat deeper traps and long theory as follow-up curriculum packs.
+
 ## 5. Implementation Order
 
 1. Create app scaffold.
@@ -495,6 +534,8 @@ Release checklist:
 9. Add practice modes.
 10. Polish design and accessibility.
 11. Add full test coverage and release documentation.
+12. Expose variation access and move audio.
+13. Expand London and Caro-Kann depth packs.
 
 ## 6. Key Engineering Practices
 

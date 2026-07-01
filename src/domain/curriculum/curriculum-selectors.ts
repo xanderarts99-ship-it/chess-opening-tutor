@@ -3,6 +3,7 @@ import type {
   CurriculumNode,
   OpeningId,
   OpeningModule,
+  Variation,
 } from "./curriculum-types";
 
 export type CurriculumNodeLocation = {
@@ -72,6 +73,52 @@ export function findNodeInOpening(
   return openingModule.nodes.find((node) => node.id === nodeId) ?? null;
 }
 
+export function findVariationInOpening(
+  curriculum: Curriculum,
+  openingId: OpeningId,
+  variationId: string,
+): Variation | null {
+  const openingModule = findOpeningModule(curriculum, openingId);
+
+  if (!openingModule) {
+    return null;
+  }
+
+  return (
+    openingModule.variations.find((variation) => variation.id === variationId) ??
+    null
+  );
+}
+
+export function getStartingNodeForVariation(
+  curriculum: Curriculum,
+  openingId: OpeningId,
+  variationId: string,
+): CurriculumNode {
+  const openingModule = getOpeningModule(curriculum, openingId);
+  const variation = openingModule.variations.find(
+    (candidate) => candidate.id === variationId,
+  );
+
+  if (!variation) {
+    throw new Error(
+      `Opening module ${openingId} has no variation ${variationId}.`,
+    );
+  }
+
+  const startingNode = openingModule.nodes.find(
+    (node) => node.id === variation.startingNodeId,
+  );
+
+  if (!startingNode) {
+    throw new Error(
+      `Variation ${variationId} starts at missing node ${variation.startingNodeId}.`,
+    );
+  }
+
+  return startingNode;
+}
+
 export function getStartingNode(
   curriculum: Curriculum,
   openingId: OpeningId,
@@ -83,15 +130,5 @@ export function getStartingNode(
     throw new Error(`Opening module ${openingId} has no variations.`);
   }
 
-  const startingNode = openingModule.nodes.find(
-    (node) => node.id === firstVariation.startingNodeId,
-  );
-
-  if (!startingNode) {
-    throw new Error(
-      `Opening module ${openingId} starts at missing node ${firstVariation.startingNodeId}.`,
-    );
-  }
-
-  return startingNode;
+  return getStartingNodeForVariation(curriculum, openingId, firstVariation.id);
 }

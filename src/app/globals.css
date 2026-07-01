@@ -301,6 +301,31 @@ textarea {
   min-width: 164px;
 }
 
+.select-control.wide {
+  min-width: min(260px, 100%);
+}
+
+.sound-toggle {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 8px 10px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.sound-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
 .board-frame {
   aspect-ratio: 1;
   overflow: hidden;
@@ -386,6 +411,11 @@ textarea {
 
 .lesson-card p {
   margin: 8px 0 0;
+}
+
+.lesson-card .variation-summary {
+  color: var(--ink);
+  font-weight: 650;
 }
 
 .tutor-actions {

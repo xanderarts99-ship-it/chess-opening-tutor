@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
 import { starterCurriculum } from "@/data/openings/curriculum";
 import {
+  getMoveSoundCue,
+  loadMoveSoundEnabled,
+  saveMoveSoundEnabled,
+  type MoveSoundKind,
+} from "@/domain/audio/move-sound";
+import {
   createMoveInputFromUci,
   createGameSnapshot,
   getLegalTargets,
@@ -12,9 +18,11 @@ import {
   type GameSnapshot,
 } from "@/domain/chess/chess-service";
 import {
+  findVariationInOpening,
+  getOpeningModule,
   findNodeInOpening,
   findNodeLocation,
-  getStartingNode,
+  getStartingNodeForVariation,
 } from "@/domain/curriculum/curriculum-selectors";
 import type { OpeningId } from "@/domain/curriculum/curriculum-types";
 import {
@@ -82,7 +90,18 @@ const openingChoices: OpeningChoice[] = [
 ];
 
 const initialOpeningId: OpeningId = "london";
-const initialLessonNode = getStartingNode(starterCurriculum, initialOpeningId);
+const initialOpeningModule = getOpeningModule(starterCurriculum, initialOpeningId);
+const initialVariation = initialOpeningModule.variations[0];
+
+if (!initialVariation) {
+  throw new Error(`Opening module ${initialOpeningId} has no variations.`);
+}
+
+const initialLessonNode = getStartingNodeForVariation(
+  starterCurriculum,
+  initialOpeningId,
+  initialVariation.id,
+);
 const initialSnapshot = createGameSnapshot(initialLessonNode.fen);
 
 function getOpeningLabel(openingId: OpeningId) {
@@ -94,6 +113,7 @@ function getOpeningLabel(openingId: OpeningId) {
 export function PracticeBoard() {
   const [snapshot, setSnapshot] = useState<GameSnapshot>(initialSnapshot);
   const [openingId, setOpeningId] = useState<OpeningId>(initialOpeningId);
+  const [variationId, setVariationId] = useState(initialVariation.id);
   const [currentNodeId, setCurrentNodeId] = useState(initialLessonNode.id);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [fromSquare, setFromSquare] = useState("");
@@ -107,6 +127,7 @@ export function PracticeBoard() {
     useState<PracticeModeId>("guided");
   const [tutorStyleId, setTutorStyleId] =
     useState<TutorStyleId>(defaultTutorStyleId);
+  const [moveSoundEnabled, setMoveSoundEnabled] = useState(true);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [progressState, setProgressState] = useState(createEmptyProgressState);
   const [reviewClockIso, setReviewClockIso] = useState(() =>
@@ -115,9 +136,18 @@ export function PracticeBoard() {
 
   const opening = openingChoices.find((choice) => choice.id === openingId) ??
     openingChoices[0];
+  const openingModule = getOpeningModule(starterCurriculum, openingId);
+  const activeVariation = openingModule.variations.find(
+    (variation) => variation.id === variationId,
+  ) ?? openingModule.variations[0];
+
+  if (!activeVariation) {
+    throw new Error(`Opening module ${openingId} has no variations.`);
+  }
+
   const currentNode =
     findNodeInOpening(starterCurriculum, openingId, currentNodeId) ??
-    getStartingNode(starterCurriculum, openingId);
+    getStartingNodeForVariation(starterCurriculum, openingId, activeVariation.id);
   const activeMode = getPracticeMode(practiceModeId);
   const currentPositionPrompt = getPositionPrompt(practiceModeId, currentNode);
   const tutorStyle = getTutorStyle(tutorStyleId);
@@ -132,11 +162,23 @@ export function PracticeBoard() {
   );
   const reviewItems = useMemo(
     () =>
-      reviewQueue.map((record) => ({
-        location: findNodeLocation(starterCurriculum, record.nodeId),
-        openingLabel: getOpeningLabel(record.openingId),
-        record,
-      })),
+      reviewQueue.map((record) => {
+        const location = findNodeLocation(starterCurriculum, record.nodeId);
+        const variationTitle = location
+          ? findVariationInOpening(
+              starterCurriculum,
+              location.openingId,
+              location.node.variationId,
+            )?.title
+          : null;
+
+        return {
+          location,
+          openingLabel: getOpeningLabel(record.openingId),
+          record,
+          variationTitle,
+        };
+      }),
     [reviewQueue],
   );
 
@@ -169,6 +211,7 @@ export function PracticeBoard() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setProgressState(loadProgressState());
+      setMoveSoundEnabled(loadMoveSoundEnabled());
       setTutorStyleId(loadTutorStyleId());
       setReviewClockIso(new Date().toISOString());
     }, 0);
@@ -198,6 +241,50 @@ export function PracticeBoard() {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  function playMoveSound(kind: MoveSoundKind) {
+    if (!moveSoundEnabled || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const AudioContextClass =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+
+      if (!AudioContextClass) {
+        return;
+      }
+
+      const cue = getMoveSoundCue(kind);
+      const audioContext = new AudioContextClass();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const durationSeconds = cue.durationMs / 1000;
+      const now = audioContext.currentTime;
+
+      oscillator.type = cue.oscillatorType;
+      oscillator.frequency.setValueAtTime(cue.frequencyHz, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(cue.gain, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSeconds);
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(now);
+      oscillator.stop(now + durationSeconds);
+      oscillator.addEventListener(
+        "ended",
+        () => {
+          void audioContext.close().catch(() => undefined);
+        },
+        { once: true },
+      );
+    } catch {
+      // Sound is optional feedback. Browser audio failures should never block practice.
+    }
+  }
 
   function recordProgressAttempt(
     evaluation: TutorMoveEvaluation,
@@ -241,6 +328,7 @@ export function PracticeBoard() {
     });
 
     if (!result.ok) {
+      playMoveSound("warning");
       setFeedbackTone("warning");
       setMessage(formatTutorStyleMessage(tutorStyleId, result.message, "warning"));
       return false;
@@ -261,6 +349,7 @@ export function PracticeBoard() {
     setFeedbackTone(evaluation.tone);
 
     if (!evaluation.advance) {
+      playMoveSound("warning");
       setSnapshot(createGameSnapshot(currentNode.fen));
       setMessage(
         formatTutorStyleMessage(
@@ -275,6 +364,8 @@ export function PracticeBoard() {
       );
       return false;
     }
+
+    playMoveSound(evaluation.feedbackKind === "correct" ? "success" : "move");
 
     let nextSnapshot = result.snapshot;
     let opponentReplySan: string | undefined;
@@ -333,6 +424,7 @@ export function PracticeBoard() {
     }
 
     setOpeningId(location.openingId);
+    setVariationId(location.node.variationId);
     setPracticeModeId("review");
     setSnapshot(createGameSnapshot(location.node.fen));
     setCurrentNodeId(location.node.id);
@@ -365,9 +457,28 @@ export function PracticeBoard() {
     );
   }
 
-  function resetLesson(nextOpeningId = openingId) {
-    const startingNode = getStartingNode(starterCurriculum, nextOpeningId);
+  function resetLesson(
+    nextOpeningId = openingId,
+    nextVariationId = activeVariation.id,
+  ) {
+    const nextOpeningModule = getOpeningModule(starterCurriculum, nextOpeningId);
+    const nextVariation =
+      nextOpeningModule.variations.find(
+        (variation) => variation.id === nextVariationId,
+      ) ?? nextOpeningModule.variations[0];
 
+    if (!nextVariation) {
+      throw new Error(`Opening module ${nextOpeningId} has no variations.`);
+    }
+
+    const startingNode = getStartingNodeForVariation(
+      starterCurriculum,
+      nextOpeningId,
+      nextVariation.id,
+    );
+
+    setOpeningId(nextOpeningId);
+    setVariationId(nextVariation.id);
     setSnapshot(createGameSnapshot(startingNode.fen));
     setCurrentNodeId(startingNode.id);
     setSelectedSquare(null);
@@ -376,12 +487,28 @@ export function PracticeBoard() {
     setHintCount(0);
     setLessonComplete(false);
     setFeedbackTone("info");
-    setMessage(formatTutorStyleMessage(tutorStyleId, startingNode.prompt, "info"));
+    setMessage(
+      formatTutorStyleMessage(
+        tutorStyleId,
+        `${nextVariation.title}: ${startingNode.prompt}`,
+        "info",
+      ),
+    );
   }
 
   function handleOpeningChange(nextOpeningId: OpeningId) {
-    setOpeningId(nextOpeningId);
-    resetLesson(nextOpeningId);
+    const nextOpeningModule = getOpeningModule(starterCurriculum, nextOpeningId);
+    const firstVariation = nextOpeningModule.variations[0];
+
+    if (!firstVariation) {
+      throw new Error(`Opening module ${nextOpeningId} has no variations.`);
+    }
+
+    resetLesson(nextOpeningId, firstVariation.id);
+  }
+
+  function handleVariationChange(nextVariationId: string) {
+    resetLesson(openingId, nextVariationId);
   }
 
   function handleModeChange(nextModeId: PracticeModeId) {
@@ -405,6 +532,19 @@ export function PracticeBoard() {
       formatTutorStyleMessage(
         nextStyleId,
         `${getTutorStyle(nextStyleId).label} selected.`,
+        "info",
+      ),
+    );
+  }
+
+  function handleMoveSoundChange(enabled: boolean) {
+    setMoveSoundEnabled(enabled);
+    saveMoveSoundEnabled(enabled);
+    setFeedbackTone("info");
+    setMessage(
+      formatTutorStyleMessage(
+        tutorStyleId,
+        enabled ? "Move sound enabled." : "Move sound muted.",
         "info",
       ),
     );
@@ -542,7 +682,7 @@ export function PracticeBoard() {
           <div>
             <h1>Practice</h1>
             <p className="practice-meta">
-              {opening.label} / {activeMode.label}, {opening.description}
+              {opening.label} / {activeVariation.title} / {activeMode.label}
             </p>
           </div>
 
@@ -580,6 +720,21 @@ export function PracticeBoard() {
                 </option>
               ))}
             </select>
+            <label className="field-label" htmlFor="variation-choice">
+              Line
+            </label>
+            <select
+              className="select-control wide"
+              id="variation-choice"
+              onChange={(event) => handleVariationChange(event.target.value)}
+              value={activeVariation.id}
+            >
+              {openingModule.variations.map((variation) => (
+                <option key={variation.id} value={variation.id}>
+                  {variation.title}
+                </option>
+              ))}
+            </select>
             <label className="field-label" htmlFor="tutor-style-choice">
               Tutor
             </label>
@@ -596,6 +751,15 @@ export function PracticeBoard() {
                 </option>
               ))}
             </select>
+            <label className="sound-toggle">
+              <input
+                checked={moveSoundEnabled}
+                onChange={(event) =>
+                  handleMoveSoundChange(event.target.checked)}
+                type="checkbox"
+              />
+              Sound
+            </label>
             <button className="button" onClick={() => resetLesson()} type="button">
               Reset lesson
             </button>
@@ -636,6 +800,7 @@ export function PracticeBoard() {
 
         <section className="lesson-card" aria-labelledby="lesson-prompt-title">
           <h3 id="lesson-prompt-title">Current position</h3>
+          <p className="variation-summary">{activeVariation.beginnerSummary}</p>
           <p>{currentPositionPrompt}</p>
           <div className="tutor-actions">
             <button className="button" onClick={showHint} type="button">
@@ -658,6 +823,10 @@ export function PracticeBoard() {
           <div>
             <dt>Orientation</dt>
             <dd>{opening.orientation === "white" ? "White" : "Black"}</dd>
+          </div>
+          <div>
+            <dt>Line</dt>
+            <dd>{activeVariation.title}</dd>
           </div>
           <div>
             <dt>Move</dt>
@@ -722,10 +891,11 @@ export function PracticeBoard() {
             <p>No positions due right now.</p>
           ) : (
             <ol className="review-list">
-              {reviewItems.map(({ location, openingLabel, record }) => (
+              {reviewItems.map(({ location, openingLabel, record, variationTitle }) => (
                 <li className="review-item" key={record.nodeId}>
                   <div>
                     <strong>{openingLabel}</strong>
+                    {variationTitle ? <span>{variationTitle}</span> : null}
                     <span>{location?.node.prompt ?? "Position needs attention."}</span>
                     <span>
                       Mastery {record.masteryScore}/10, misses {record.misses}

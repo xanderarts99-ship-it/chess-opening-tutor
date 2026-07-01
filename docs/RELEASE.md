@@ -51,19 +51,23 @@ npm run dev -- --port 3100
 London System:
 
 - Select `London System`.
+- Confirm the `Line` selector includes Core London Setup, King's Indian Setup, Early ...c5 Pressure, and Symmetric ...Bf5.
 - Select `Guided`.
 - Play `d2` to `d4`.
 - Confirm the tutor marks the move correct and replies `d5`.
+- Switch to `Early ...c5 Pressure` and confirm the current position prompt changes.
 - Reset and play `e2` to `e4`.
 - Confirm the tutor explains the repertoire mistake and the position appears in review.
 
 Caro-Kann:
 
 - Select `Caro-Kann`.
+- Confirm the `Line` selector includes Core, Advance, Exchange, Classical, Modern, Fantasy, and Panov-Botvinnik entries.
 - Confirm the board is oriented from Black's side.
 - Select `Assisted`.
 - Play `c7` to `c6`.
 - Confirm the tutor marks the move correct and replies `d4`.
+- Switch to `Fantasy Variation` and confirm the current position prompt changes.
 - Reset and play `c7` to `c5`.
 - Confirm the tutor catches the Sicilian mistake.
 
@@ -74,6 +78,8 @@ Tutor controls:
 - Use `Retry` and confirm the current opening resets cleanly.
 - Switch tutor styles and refresh; confirm the selected style persists locally.
 - Switch practice modes and confirm the board state does not reset.
+- Toggle `Sound` off and confirm move feedback is muted.
+- Toggle `Sound` on, make a move, and confirm the board gives audible feedback.
 
 Progress and review:
 
@@ -109,7 +115,9 @@ V1 does not require hosting, accounts, a backend, or paid services. If you want 
 
 - London System practice works as White.
 - Caro-Kann practice works as Black.
+- London and Caro-Kann variation selectors expose all authored starter lines.
 - Legal and illegal moves behave correctly.
+- Optional move audio can be enabled or muted locally.
 - Tutor feedback covers correct moves, known mistakes, unknown legal moves, hints, reveal, and retries.
 - Missed positions return in review.
 - Local progress and tutor style survive refresh.

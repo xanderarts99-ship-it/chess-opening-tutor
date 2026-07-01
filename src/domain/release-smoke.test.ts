@@ -9,6 +9,7 @@ import {
   findNodeInOpening,
   getOpeningModule,
   getStartingNode,
+  getStartingNodeForVariation,
 } from "@/domain/curriculum/curriculum-selectors";
 import type { OpeningId } from "@/domain/curriculum/curriculum-types";
 import {
@@ -63,6 +64,26 @@ describe("release smoke flow", () => {
       masteryScore: 2,
       misses: 0,
     });
+  });
+
+  it("exposes multiple variation starts beyond each default line", () => {
+    expect(getOpeningModule(starterCurriculum, "london").variations).toHaveLength(4);
+    expect(getOpeningModule(starterCurriculum, "caro-kann").variations)
+      .toHaveLength(7);
+    expect(
+      getStartingNodeForVariation(
+        starterCurriculum,
+        "london",
+        "london-symmetric-bf5",
+      ).id,
+    ).toBe("london-bf5-001");
+    expect(
+      getStartingNodeForVariation(
+        starterCurriculum,
+        "caro-kann",
+        "caro-kann-panov",
+      ).id,
+    ).toBe("caro-panov-001");
   });
 
   it("routes a missed London position into immediate review", () => {
